@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <csignal>
+#include <string>
 
 
 #include "Requests.hh"
@@ -17,6 +18,25 @@ static void log_errno(int priority, const char* where) {
   openlog("psirver", LOG_PID | LOG_CONS, LOG_USER);
   syslog(priority, "%s: %s", where, std::strerror(errno));
 }
+
+// Global variable to store the path so the signal handler can delete it [cite: 46]
+std::string global_pid_path;
+
+// Step 6: The "Cleanup" function [cite: 56, 57]
+void handle_sigint(int sig) {
+    // 1. Write a message to the system log 
+    syslog(LOG_INFO, "Psirver shutting down gracefully.");
+    
+    // 2. Remove the PID file [cite: 46, 57]
+    if (!global_pid_path.empty()) {
+        unlink(global_pid_path.c_str());
+    }
+    
+    // 3. Close the socket and exit 
+    if (server_socket >= 0) close(server_socket);
+    exit(EXIT_SUCCESS);
+}
+
 
 // Configuration options and other constants
 static constexpr uint16_t DEFAULT_PORT = 8000;
@@ -253,9 +273,34 @@ if (argc == 1) {
   
   // --> TODO Insert code here that creates
   // --> $(PSIRVER_HOME)/psirver.pid
+	// --- STEP 5: PSIRVER_HOME and PID File ---
+    const char* home_dir = std::getenv("PSIRVER_HOME");
+    if (!home_dir) {
+        std::cerr << "Error: PSIRVER_HOME not set." << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // Combine folder path and filename [cite: 44]
+    global_pid_path = std::string(home_dir) + "/psirver.pid";
+
+    // Create the file (0644 means owner can write, others can read) [cite: 44]
+    int pid_fd = open(global_pid_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (pid_fd < 0) {
+        std::cerr << "Error: Could not create PID file." << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    // Write the current process ID into the file [cite: 44]
+    std::string pid_str = std::to_string(getpid());
+    write(pid_fd, pid_str.c_str(), pid_str.size());
+    close(pid_fd);
 
   // --> TODO Insert code here that registers a graceful shutdown
   // --> handler on SIGINT
+	// --- STEP 6: SIGINT Handler ---
+    struct sigaction sa{};
+    sa.sa_handler = handle_sigint; // This calls your cleanup function
+    sigaction(SIGINT, &sa, nullptr);
 
  if (init_socket(port) != 0) {
   return EXIT_FAILURE;
