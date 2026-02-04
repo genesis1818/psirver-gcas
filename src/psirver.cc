@@ -256,7 +256,7 @@ if (argc == 1) {
   // --> TODO Insert code here that registers a graceful shutdown
   // --> handler on SIGINT
 
- if (init_socket(DEFAULT_PORT) != 0) {
+ if (init_socket(port) != 0) {
   return EXIT_FAILURE;
 }
     
