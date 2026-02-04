@@ -9,7 +9,9 @@
 #include <cstring>
 #include <iostream>
 #include <csignal>
-#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 
 
 #include "Requests.hh"
@@ -19,25 +21,6 @@ static void log_errno(int priority, const char* where) {
   syslog(priority, "%s: %s", where, std::strerror(errno));
 }
 
-// Global variable to store the path so the signal handler can delete it [cite: 46]
-std::string global_pid_path;
-
-// Step 6: The "Cleanup" function [cite: 56, 57]
-void handle_sigint(int sig) {
-    // 1. Write a message to the system log 
-    syslog(LOG_INFO, "Psirver shutting down gracefully.");
-    
-    // 2. Remove the PID file [cite: 46, 57]
-    if (!global_pid_path.empty()) {
-        unlink(global_pid_path.c_str());
-    }
-    
-    // 3. Close the socket and exit 
-    if (server_socket >= 0) close(server_socket);
-    exit(EXIT_SUCCESS);
-}
-
-
 // Configuration options and other constants
 static constexpr uint16_t DEFAULT_PORT = 8000;
 static constexpr ssize_t MAX_REQUEST_SZ = 0x10000;
@@ -46,6 +29,10 @@ static constexpr char HEADER_END[] = "\r\n\r\n";
 
 // Global server socket
 int server_socket = -1;
+
+// Globals for PID file and shutdown handling
+static std::string pid_path;
+static volatile sig_atomic_t shutdown_requested = 0;
 
 // Reply to the client with an HTTP status line and a human-readable
 // response body
@@ -171,10 +158,12 @@ int process_request()
   socklen_t addrlen = sizeof client_addr;
 
   int client = accept(server_socket, (struct sockaddr *)&client_addr, &addrlen);
-  if(client < 0) {
+  if (client < 0) {
+  if (!shutdown_requested) {
     log_errno(LOG_ERR, "accept() failed");
-    return -1;
   }
+  return -1;
+}
   
   char buffer[BUFFER_SZ]; 
   size_t header_end_pos = std::string::npos;
@@ -242,6 +231,51 @@ int process_request()
   return -1;
 }
 
+static void write_pid_file_or_exit() {
+  const char* home = std::getenv("PSIRVER_HOME");
+  if (!home) {
+    std::cerr << "Error: PSIRVER_HOME is not set.\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  struct stat st;
+  if (stat(home, &st) != 0 || !S_ISDIR(st.st_mode)) {
+    std::cerr << "Error: PSIRVER_HOME directory does not exist: " << home << "\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  pid_path = std::string(home) + "/psirver.pid";
+
+  // 0644 = owner writable, world readable
+  int fd = open(pid_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if (fd < 0) {
+    std::cerr << "Error: cannot create PID file: " << pid_path
+              << " (" << std::strerror(errno) << ")\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  std::string pid_str = std::to_string(getpid()) + "\n";
+  ssize_t w = write(fd, pid_str.c_str(), pid_str.size());
+  if (w < 0) {
+    close(fd);
+    std::cerr << "Error: cannot write PID file: " << pid_path
+              << " (" << std::strerror(errno) << ")\n";
+    std::exit(EXIT_FAILURE);
+  }
+
+  close(fd);
+}
+
+static void handle_sigint(int) {
+  shutdown_requested = 1;
+
+  // Closing the server socket wakes up accept() with an error
+  if (server_socket >= 0) {
+    close(server_socket);
+    server_socket = -1;
+  }
+}
+
 // The main workhorse. Library functions used:
 // - close()
 int main(int argc, char **argv)
@@ -266,50 +300,35 @@ if (argc == 1) {
   std::cerr << "Usage: " << argv[0] << " [port]\n";
   return EXIT_FAILURE;
 }
+write_pid_file_or_exit();
 
-  // --> TODO If command-line parameter is provided, treat it as the
-  // --> port number. (Make sure it is != 0.) Otherwise, use the
-  // --> default port number.
-  
-  // --> TODO Insert code here that creates
-  // --> $(PSIRVER_HOME)/psirver.pid
-	// --- STEP 5: PSIRVER_HOME and PID File ---
-    const char* home_dir = std::getenv("PSIRVER_HOME");
-    if (!home_dir) {
-        std::cerr << "Error: PSIRVER_HOME not set." << std::endl;
-        return EXIT_FAILURE;
-    }
+struct sigaction sa{};
+sa.sa_handler = handle_sigint;
+sigemptyset(&sa.sa_mask);
+sa.sa_flags = 0;
 
-    // Combine folder path and filename [cite: 44]
-    global_pid_path = std::string(home_dir) + "/psirver.pid";
-
-    // Create the file (0644 means owner can write, others can read) [cite: 44]
-    int pid_fd = open(global_pid_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (pid_fd < 0) {
-        std::cerr << "Error: Could not create PID file." << std::endl;
-        return EXIT_FAILURE;
-    }
-    
-    // Write the current process ID into the file [cite: 44]
-    std::string pid_str = std::to_string(getpid());
-    write(pid_fd, pid_str.c_str(), pid_str.size());
-    close(pid_fd);
-
-  // --> TODO Insert code here that registers a graceful shutdown
-  // --> handler on SIGINT
-	// --- STEP 6: SIGINT Handler ---
-    struct sigaction sa{};
-    sa.sa_handler = handle_sigint; // This calls your cleanup function
-    sigaction(SIGINT, &sa, nullptr);
-
- if (init_socket(port) != 0) {
+if (sigaction(SIGINT, &sa, nullptr) != 0) {
+  std::cerr << "Error: sigaction(SIGINT) failed.\n";
+  unlink(pid_path.c_str());
   return EXIT_FAILURE;
 }
-    
-while(true) {
-  if (process_request() != 0) break;
+
+if (init_socket(port) != 0) {
+  unlink(pid_path.c_str());
+  return EXIT_FAILURE;
 }
 
-  close(server_socket);
-  return EXIT_SUCCESS;
+while (!shutdown_requested) {
+  if (process_request() != 0) {
+    if (shutdown_requested) break;
+    break;
+  }
+}
+
+if (!pid_path.empty()) {
+  unlink(pid_path.c_str());
+}
+
+if (server_socket >= 0) close(server_socket);
+return EXIT_SUCCESS;
 }
