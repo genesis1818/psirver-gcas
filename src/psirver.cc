@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstring>
 #include <iostream>
+#include <csignal>
 
 
 #include "Requests.hh"
