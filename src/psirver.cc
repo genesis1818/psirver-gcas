@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <cstring>
+#include <iostream>
 
 
 #include "Requests.hh"
@@ -224,6 +225,26 @@ int process_request()
 // - close()
 int main(int argc, char **argv)
 {
+uint16_t port = DEFAULT_PORT;
+
+if (argc == 1) {
+  port = DEFAULT_PORT;
+} else if (argc == 2) {
+  char* end = nullptr;
+  errno = 0;
+  long p = std::strtol(argv[1], &end, 10);
+
+  if (errno != 0 || end == argv[1] || *end != '\0' || p <= 0 || p > 65535) {
+    std::cerr << "Usage: " << argv[0] << " [port]\n";
+    std::cerr << "  port must be a positive integer (1-65535)\n";
+    return EXIT_FAILURE;
+  }
+
+  port = static_cast<uint16_t>(p);
+} else {
+  std::cerr << "Usage: " << argv[0] << " [port]\n";
+  return EXIT_FAILURE;
+}
 
   // --> TODO If command-line parameter is provided, treat it as the
   // --> port number. (Make sure it is != 0.) Otherwise, use the
