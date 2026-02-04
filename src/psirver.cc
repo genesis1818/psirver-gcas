@@ -5,22 +5,8 @@
 #include <arpa/inet.h>
 #include <syslog.h> 
 #include <fcntl.h>
-#include <cstring>
-#include <cerrno>
+
 #include "Requests.hh"
-
-void log_error(const char* msg)
-{
-    // Open a connection to the system logger
-    openlog("psirver", LOG_PID | LOG_CONS, LOG_USER);
-
-    // Log the error message + system error
-    syslog(LOG_ERR, "%s: %s", msg, strerror(errno));
-
-    // Close the logger
-    closelog();
-}
-
 
 // Configuration options and other constants
 static constexpr uint16_t DEFAULT_PORT = 8000;
@@ -63,7 +49,7 @@ int init_socket(uint16_t port)
 {
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
-    log_error("describe what failed here");
+    // --> TODO Call syslog here
     return -1;
   }
     
@@ -74,20 +60,20 @@ int init_socket(uint16_t port)
 
   if (bind(server_socket, reinterpret_cast<sockaddr *>(&server_addr),
 	   sizeof(server_addr)) < 0) {
-    log_error("describe what failed here");
+    // --> TODO Call syslog here
     close(server_socket);
     return -1;
   }
   
   if (listen(server_socket, SOMAXCONN) != 0) {
-    log_error("describe what failed here");
+    // --> TODO Call syslog here
     close(server_socket);
     return -1;
   }
 
   // Prevent leaking server_socket into child processes
   if(-1 == fcntl(server_socket, F_SETFD, FD_CLOEXEC)) {
-    log_error("something failed");
+    // --> TODO Call syslog here but do not fail
   }
   
   return 0;
@@ -156,7 +142,7 @@ int process_request()
 
   int client = accept(server_socket, (struct sockaddr *)&client_addr, &addrlen);
   if(client < 0) {
-    log_error("describe what failed here");
+    // --> TODO Call syslog here
     return -1;
   }
   
@@ -230,11 +216,6 @@ int process_request()
 // - close()
 int main(int argc, char **argv)
 {
-	int fd = open("/root/secret.txt", O_RDONLY);
-if (fd < 0) {
-    log_error("Permission test: failed to open file");
-}
-
 
   // --> TODO If command-line parameter is provided, treat it as the
   // --> port number. (Make sure it is != 0.) Otherwise, use the
