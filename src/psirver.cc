@@ -5,8 +5,16 @@
 #include <arpa/inet.h>
 #include <syslog.h> 
 #include <fcntl.h>
+#include <cerrno>
+#include <cstring>
+
 
 #include "Requests.hh"
+
+static void log_errno(int priority, const char* where) {
+  openlog("psirver", LOG_PID | LOG_CONS, LOG_USER);
+  syslog(priority, "%s: %s", where, std::strerror(errno));
+}
 
 // Configuration options and other constants
 static constexpr uint16_t DEFAULT_PORT = 8000;
@@ -49,7 +57,7 @@ int init_socket(uint16_t port)
 {
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
-    // --> TODO Call syslog here
+    log_errno(LOG_ERR, "socket() failed");
     return -1;
   }
     
@@ -60,20 +68,20 @@ int init_socket(uint16_t port)
 
   if (bind(server_socket, reinterpret_cast<sockaddr *>(&server_addr),
 	   sizeof(server_addr)) < 0) {
-    // --> TODO Call syslog here
+    log_errno(LOG_ERR, "bind() failed");
     close(server_socket);
     return -1;
   }
   
   if (listen(server_socket, SOMAXCONN) != 0) {
-    // --> TODO Call syslog here
+    log_errno(LOG_ERR, "listen() failed");
     close(server_socket);
     return -1;
   }
 
   // Prevent leaking server_socket into child processes
   if(-1 == fcntl(server_socket, F_SETFD, FD_CLOEXEC)) {
-    // --> TODO Call syslog here but do not fail
+	  log_errno(LOG_WARNING, "fcntl(FD_CLOEXEC) failed");
   }
   
   return 0;
@@ -142,7 +150,7 @@ int process_request()
 
   int client = accept(server_socket, (struct sockaddr *)&client_addr, &addrlen);
   if(client < 0) {
-    // --> TODO Call syslog here
+    log_errno(LOG_ERR, "accept() failed");
     return -1;
   }
   
