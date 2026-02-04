@@ -23,7 +23,7 @@ static constexpr size_t BUFFER_SZ = 4096;
 static constexpr char HEADER_END[] = "\r\n\r\n";
 
 // Global server socket
-int server_socket;
+int server_socket = -1;
 
 // Reply to the client with an HTTP status line and a human-readable
 // response body
@@ -235,14 +235,13 @@ int main(int argc, char **argv)
   // --> TODO Insert code here that registers a graceful shutdown
   // --> handler on SIGINT
 
-  init_socket(DEFAULT_PORT);
-  if(server_socket < 0) {
-    return EXIT_FAILURE;
-  }
+ if (init_socket(DEFAULT_PORT) != 0) {
+  return EXIT_FAILURE;
+}
     
-  while(true) { // Not really, but close
-    process_request(); 
-  }
+while(true) {
+  if (process_request() != 0) break;
+}
 
   close(server_socket);
   return EXIT_SUCCESS;
