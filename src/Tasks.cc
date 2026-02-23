@@ -2,13 +2,13 @@
 
 int HealthTask::execute()
 {
-  // --> Implement later
+  reply(client, "HTTP/1.1 200 OK\r\n", "OK\n");
   return 0;
 }
  
 int TeapotTask::execute()
 {
-  // --> Implement later
+  reply(client, "HTTP/1.1 418 I'm a teapot\r\n", "I'm a teapot\n");
   return 0;
 }
 
