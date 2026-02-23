@@ -1,4 +1,5 @@
 #include "Tasks.hh"
+#include <sstream>
 
 int HealthTask::execute()
 {
