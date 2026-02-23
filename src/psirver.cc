@@ -173,35 +173,32 @@ Task *request2task()
   }
   
   if(request.compare(0, strlen("GET "), "GET ") == 0) {
-    std::string headers = request.substr(0, header_end_pos);
+  std::string headers = request.substr(0, header_end_pos);
 
-    Task *task = Task::construct(client, headers);
-
-    // TODO: move messaging to execute()
-    reply(client, "HTTP/1.1 200 OK", "Hello from Psirver!");
-    return task;
+  Task *task = Task::construct(client, headers);
+  if (task) {
+    task->execute();
+    delete task;
   }
+  return nullptr;
+}
 
   if(request.compare(0, strlen("POST "), "POST ") == 0) {
-    std::string headers = request.substr(0, header_end_pos);
+  std::string headers = request.substr(0, header_end_pos);
 
-    ssize_t content_length = parse_content_length(client, headers);
-      
-    if (content_length < 0) {
-      return nullptr;
-    }
-
-    std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
-    body = read_body(client, content_length, body);
-
-    Task *task = Task::construct(client, headers, body);    
-    // TODO: move messaging to execute()
-    reply(client, "HTTP/1.1 200 OK", "Hello from Psirver!");
-    return task;
+  ssize_t content_length = parse_content_length(client, headers);
+  if (content_length < 0) {
+    return nullptr;
   }
-  
-  reply(client, "HTTP/1.1 405 Method Not Allowed",
-	(request.substr(0, 0x10) + "...").c_str());
+
+  std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
+  body = read_body(client, content_length, body);
+
+  Task *task = Task::construct(client, headers, body);
+  if (task) {
+    task->execute();
+    delete task;
+  }
   return nullptr;
 }
 
