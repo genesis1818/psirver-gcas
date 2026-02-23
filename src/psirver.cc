@@ -37,9 +37,8 @@ void reply(int client, const char *status_line, const char *body)
 
   write(client, headers.data(), headers.size());
   write(client, body, strlen(body));
-  close(client);
+  // DO NOT close(client) here.
 }
-
 // Open the main server socket and prepare it for accepting
 // connections. Library functions used:
 // - htonl()/htons()
@@ -149,59 +148,58 @@ Task *request2task()
     syslog(LOG_ERR, "Accept: %s", strerror(errno));
     return nullptr;
   }
-  
-  char buffer[READ_BUFFER_SZ]; 
+
+  char buffer[READ_BUFFER_SZ];
   size_t header_end_pos = std::string::npos;
   ssize_t chunk_sz;
-  
+
   std::string request;
-  
-  // This code may read more data than MAX_REQUEST_SZ
-  // but by no more than the buffer size
+
   while (request.size() < MAX_REQUEST_SZ &&
-	 (chunk_sz = read(client, buffer, sizeof(buffer))) > 0) {
+         (chunk_sz = read(client, buffer, sizeof(buffer))) > 0) {
     request.append(buffer, chunk_sz);
     header_end_pos = request.find(END_OF_HEADER);
     if (header_end_pos != std::string::npos) {
       break;
     }
   }
-  
+
   if (request.size() > MAX_REQUEST_SZ) {
     reply(client, "HTTP/1.1 413 Content Too Large", "Content Too Large");
-    return nullptr;
-  }
-  
-  if(request.compare(0, strlen("GET "), "GET ") == 0) {
-  std::string headers = request.substr(0, header_end_pos);
-
-  Task *task = Task::construct(client, headers);
-  if (task) {
-    task->execute();
-    delete task;
-  }
-  return nullptr;
-}
-
-  if(request.compare(0, strlen("POST "), "POST ") == 0) {
-  std::string headers = request.substr(0, header_end_pos);
-
-  ssize_t content_length = parse_content_length(client, headers);
-  if (content_length < 0) {
+    close(client);
     return nullptr;
   }
 
-  std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
-  body = read_body(client, content_length, body);
+  if (request.compare(0, strlen("GET "), "GET ") == 0) {
+    std::string headers = request.substr(0, header_end_pos);
 
-  Task *task = Task::construct(client, headers, body);
-  if (task) {
-    task->execute();
-    delete task;
+    Task *t = Task::construct(client, headers);
+    if (!t) close(client);
+    return t;
   }
+
+  if (request.compare(0, strlen("POST "), "POST ") == 0) {
+    std::string headers = request.substr(0, header_end_pos);
+
+    ssize_t content_length = parse_content_length(client, headers);
+    if (content_length < 0) {
+      close(client);
+      return nullptr;
+    }
+
+    std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
+    body = read_body(client, content_length, body);
+
+    Task *t = Task::construct(client, headers, body);
+    if (!t) close(client);
+    return t;
+  }
+
+  reply(client, "HTTP/1.1 405 Method Not Allowed",
+        (request.substr(0, 0x10) + "...").c_str());
+  close(client);
   return nullptr;
 }
-
 // SIGINT handler. Will cause a graceful shutdown. Library functions used:
 // - close()
 // - unlink()
