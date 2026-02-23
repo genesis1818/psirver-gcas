@@ -1,5 +1,6 @@
 #include "Tasks.hh"
 #include <sstream>
+#include <string>
 
 int HealthTask::execute()
 {
@@ -152,7 +153,7 @@ Task *Task::construct(int client, std::string headers)
 
 // This function parses the headers and the body returns one of the
 // POST task objects
-Task *Task::construct(int /*client*/, std::string headers, std::string body)
+Task *Task::construct(int client, std::string headers, std::string body)
 {
   // Content-Type: application/x-www-form-urlencoded
   // Body:
