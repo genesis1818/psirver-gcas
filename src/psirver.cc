@@ -163,6 +163,12 @@ Task *request2task()
       break;
     }
   }
+	
+  if (header_end_pos == std::string::npos) {
+  reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+  close(client);
+  return nullptr;
+}
 
   if (request.size() > MAX_REQUEST_SZ) {
     reply(client, "HTTP/1.1 413 Content Too Large", "Content Too Large");
