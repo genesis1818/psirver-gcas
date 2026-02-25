@@ -138,9 +138,16 @@ int StdoutTask::execute()
 
 int UploadTask::execute()
 {
-  std::string body = std::to_string(script_id) + "\n";
-  reply(client, "HTTP/1.1 200 OK", body.c_str());
+ 
+  reply(client, "HTTP/1.1 200 OK", "OK\n");
   return 0;
+}
+
+  
+{
+  reply(client, "HTTP/1.1 200 OK", "OK\n");
+  return 0;
+}
 }
 
 int ScriptListTask::execute()
