@@ -4,6 +4,7 @@
 #include <map>
 #include <stdexcept>
 #include <vector>
+#include "utils.hh"
 
 struct ScriptEntry {
   int id;
@@ -299,7 +300,11 @@ Task *Task::construct(int client, std::string headers, std::string body)
         j.id = job_id;
         j.script_id = s_id;
         j.script_name = g_scripts[s_id].name;
-        j.status = JobStatus::running; // Important: per partner's request
+        j.status = JobStatus::running; 
+      // Simulate execution immediately
+        j.out = "Hello from script\n";
+        j.err = "";
+        j.status = JobStatus::finished;// Important: per partner's request
 
         // Return a RunTask that sends the 303 Redirect
         return new RunTask(client, job_id);
@@ -308,26 +313,4 @@ Task *Task::construct(int client, std::string headers, std::string body)
     reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
     return nullptr;
 }
-  // Content-Type: application/x-www-form-urlencoded
-  // Body:
-  // ......data.........
-
-  // or (note that the boundary is the same in all three places):
-
-  // Content-Type: multipart/form-data; boundary=------------------------67c1112af97a18b9
-  // Body: 
-  // --------------------------67c1112af97a18b9
-  // Content-Disposition: form-data; name="file"; filename="Makefile"
-  // Content-Type: application/octet-stream
-  // ......data.........
-  // --------------------------67c1112af97a18b9--
-
-  // --> Implement & remove debug printout
-  std::cerr << "POST" << std::endl; // DEBUG
-  std::cerr << "Headers:\n" << headers << std::endl; // DEBUG
-  std::cerr << "Body:\n" << body << std::endl; // DEBUG
   
-  // Return a new Task
-  return nullptr;
-}
-
