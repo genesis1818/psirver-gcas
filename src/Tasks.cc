@@ -84,7 +84,8 @@ int DeleteTask::execute()
 
 int RunTask::execute()
 {
-  // --> Implement later
+  std::string response_header = "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + std::to_string(job_id);
+  reply(client, response_header.c_str(), "");
   return 0;
 }
 
@@ -136,7 +137,8 @@ int StdoutTask::execute()
 
 int UploadTask::execute()
 {
-  // --> Implement later
+  std::string body = std::to_string(script_id) + "\n";
+  reply(client, "HTTP/1.1 200 OK", body.c_str());
   return 0;
 }
 
@@ -247,6 +249,65 @@ Task *Task::construct(int client, std::string headers)
 // POST task objects
 Task *Task::construct(int client, std::string headers, std::string body)
 {
+
+    // 1. Get the Request Line (First line of headers)
+    std::string request_line = headers.substr(0, headers.find("\r\n"));
+    std::stringstream ss(request_line);
+    std::string method, path, version;
+    ss >> method >> path >> version;
+
+    // 2. HANDLE SCRIPT UPLOAD (POST /scripts/upload)
+    if (path == "/scripts/upload") {
+        // Check if Content-Type header exists and is multipart
+        if (headers.find("Content-Type: multipart/form-data") == std::string::npos) {
+            reply(client, "HTTP/1.1 415 Unsupported Media Type", "415 Unsupported Media Type\n");
+            return nullptr;
+        }
+
+        // Create a new script entry using your ScriptEntry struct
+        int script_id = g_next_script_id++;
+        ScriptEntry &s = g_scripts[script_id];
+        s.id = script_id;
+        
+        // Use the helpers from utils.cc to parse the body
+        s.name = extract_filename(body);
+        s.contents = extract_content(body);
+
+        // This task will handle sending the 200 OK and script_id
+        return new UploadTask(client, script_id);
+    }
+
+    // 3. HANDLE RUNNING A SCRIPT (POST /scripts/<id>/run)
+    // We check if the path starts with /scripts/ and ends with /run
+    if (path.find("/scripts/") == 0 && path.find("/run") != std::string::npos) {
+        
+        // Extract ID (This logic is similar to what you did in the first construct)
+        size_t first_slash = path.find('/', 1);
+        size_t second_slash = path.find('/', first_slash + 1);
+        std::string id_str = path.substr(first_slash + 1, second_slash - first_slash - 1);
+        int s_id = std::stoi(id_str);
+
+        // Check if script exists in your map
+        if (g_scripts.find(s_id) == g_scripts.end()) {
+            reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
+            return nullptr;
+        }
+
+        // Create a new Job in your g_jobs map
+        int job_id = g_next_job_id++;
+        JobEntry &j = g_jobs[job_id];
+        j.id = job_id;
+        j.script_id = s_id;
+        j.script_name = g_scripts[s_id].name;
+        j.status = JobStatus::running; // Important: per partner's request
+
+        // Return a RunTask that sends the 303 Redirect
+        return new RunTask(client, job_id);
+    }
+
+    reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
+    return nullptr;
+}
   // Content-Type: application/x-www-form-urlencoded
   // Body:
   // ......data.........
