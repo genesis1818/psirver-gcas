@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <iostream>
 #include <syslog.h> 
+#include <unistd.h>   
+#include <sys/types.h>
 
 #include "utils.hh"
 
