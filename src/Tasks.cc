@@ -309,7 +309,7 @@ Task *Task::construct(int client, std::string headers, std::string body)
         j.status = JobStatus::finished;// Important: per partner's request
 
         // Return a RunTask that sends the 303 Redirect
-        return new RunTask(client, job_id);
+        return new RunTask(client, job_id, {});
     }
 
     reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
