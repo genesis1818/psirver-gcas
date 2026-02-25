@@ -147,7 +147,7 @@ int UploadTask::execute()
 {
   reply(client, "HTTP/1.1 200 OK", "OK\n");
   return 0;
-}
+
 }
 
 int ScriptListTask::execute()
