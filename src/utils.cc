@@ -113,7 +113,9 @@ void add_sigint_handler()
     syslog(LOG_ERR, "Sigaction: %s", strerror(errno));
     exit(EXIT_FAILURE);
   }
-	// --- ADD THIS TO THE BOTTOM OF utils.cc ---
+} // <--- THIS BRACE CLOSES add_sigint_handler
+
+// --- NOW THE NEW FUNCTIONS START OUTSIDE ---
 
 // This function looks for "filename=" inside the upload data
 std::string extract_filename(const std::string& body) {
