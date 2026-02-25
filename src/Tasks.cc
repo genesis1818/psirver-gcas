@@ -275,7 +275,8 @@ Task *Task::construct(int client, std::string headers, std::string body)
         s.contents = extract_content(body);
 
         // This task will handle sending the 200 OK and script_id
-        return new UploadTask(client, script_id);
+       
+        return new UploadTask(client, s.name, s.contents);
     }
 
     // 3. HANDLE RUNNING A SCRIPT (POST /scripts/<id>/run)
