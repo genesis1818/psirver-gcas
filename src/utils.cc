@@ -6,8 +6,9 @@
 #include <syslog.h> 
 #include <unistd.h>   
 #include <sys/types.h>
-
 #include "utils.hh"
+#include <unistd.h>
+#include <sys/types.h>
 
 static constexpr char PID_FILE_NAME[] = "psirver.pid";
 static constexpr char HOME_VAR[] = "PSIRVER_HOME";
