@@ -10,3 +10,7 @@ void add_sigint_handler();
 // Global variables
 extern int server_socket;
 extern std::string pid_path;
+
+// Add these to the bottom of utils.hh
+std::string extract_filename(const std::string& body);
+std::string extract_content(const std::string& body);
