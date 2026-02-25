@@ -85,7 +85,7 @@ int DeleteTask::execute()
 
 int RunTask::execute()
 {
-  std::string response_header = "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + std::to_string(job_id);
+  std::string response_header = "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + std::to_string(script_id);
   reply(client, response_header.c_str(), "");
   return 0;
 }
