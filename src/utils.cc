@@ -135,5 +135,5 @@ std::string extract_content(const std::string& body) {
     
     return body.substr(pos + 4); // The +4 skips the \r\n\r\n
 }
-}
+
 
