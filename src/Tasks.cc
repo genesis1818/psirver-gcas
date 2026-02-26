@@ -208,7 +208,7 @@ Task *Task::construct(int client, std::string headers)
 
   if (parts.size() == 2 && parts[0] == "jobs") {
     if (parts[1].find_first_not_of("0123456789") != std::string::npos) {
-      reply(client, "HTTP/1.1 400 Bad Request", "400 Bad Request\n");
+      reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
       return nullptr;
     }
     return new JobStatusTask(client, std::stoi(parts[1]));
@@ -216,7 +216,7 @@ Task *Task::construct(int client, std::string headers)
 
   if (parts.size() == 3 && parts[0] == "jobs") {
     if (parts[1].find_first_not_of("0123456789") != std::string::npos) {
-      reply(client, "HTTP/1.1 400 Bad Request", "400 Bad Request\n");
+      reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
       return nullptr;
     }
 
@@ -237,7 +237,7 @@ Task *Task::construct(int client, std::string headers)
 
   if (parts.size() == 3 && parts[0] == "scripts" && parts[2] == "delete") {
     if (parts[1].find_first_not_of("0123456789") != std::string::npos) {
-      reply(client, "HTTP/1.1 400 Bad Request", "400 Bad Request\n");
+      reply(client, "HTTP/1.1 404 Not Found", "404 Not Found\n");
       return nullptr;
     }
 
