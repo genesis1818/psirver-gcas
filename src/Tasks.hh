@@ -91,21 +91,22 @@ public:
 
 class RunTask : public Task { // POST /scripts/<id>/run + args
 private:
-  int script_id;
+  int job_id;
   std::vector<std::string> args;
 public:
-  RunTask(int client, int id, std::vector<std::string>args)
-    : Task(client), script_id(id), args(args) {};
+  RunTask(int client, int id, std::vector<std::string> args)
+    : Task(client), job_id(id), args(std::move(args)) {};
   int execute();
 };
 
 class UploadTask : public Task { // POST /scripts/upload
 private:
+  int script_id;
   std::string filename;
   std::string script;
 public:
-  UploadTask(int client, std::string filename, std::string script)
-    : Task(client), filename(filename), script(script) {};
+  UploadTask(int client, int id, std::string filename, std::string script)
+    : Task(client), script_id(id), filename(std::move(filename)), script(std::move(script)) {};
   int execute();
 };
 
