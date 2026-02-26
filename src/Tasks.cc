@@ -85,9 +85,9 @@ int DeleteTask::execute()
 
 int RunTask::execute()
 {
-  std::string header =
-    "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + std::to_string(job_id);
-  reply(client, header.c_str(), (std::to_string(job_id) + "\n").c_str()); // body should be job_id too
+  std::string job = std::to_string(job_id);
+  std::string header = "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + job;
+  reply(client, header.c_str(), (job + "\n").c_str());
   return 0;
 }
 
@@ -139,8 +139,8 @@ int StdoutTask::execute()
 
 int UploadTask::execute()
 {
- 
-  reply(client, "HTTP/1.1 200 OK", "OK\n");
+  std::string body = std::to_string(script_id) + "\n";
+  reply(client, "HTTP/1.1 200 OK", body.c_str());
   return 0;
 }
 
