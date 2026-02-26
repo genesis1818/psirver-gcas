@@ -85,8 +85,9 @@ int DeleteTask::execute()
 
 int RunTask::execute()
 {
-  std::string response_header = "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + std::to_string(script_id);
-  reply(client, response_header.c_str(), "");
+  std::string header =
+    "HTTP/1.1 303 See Other\r\nLocation: /jobs/" + std::to_string(job_id);
+  reply(client, header.c_str(), (std::to_string(job_id) + "\n").c_str()); // body should be job_id too
   return 0;
 }
 
@@ -277,7 +278,7 @@ Task *Task::construct(int client, std::string headers, std::string body)
 
         // This task will handle sending the 200 OK and script_id
        
-        return new UploadTask(client, s.name, s.contents);
+        return new UploadTask(client, script_id, s.name, s.contents);
     }
 
     // 3. HANDLE RUNNING A SCRIPT (POST /scripts/<id>/run)
