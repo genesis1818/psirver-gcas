@@ -4,6 +4,9 @@
 #include <vector>
 #include <unistd.h>
 
+static constexpr char RN[] = "\r\n";
+static constexpr char END_OF_HEADER[] = "\r\n\r\n";
+
 void reply(int client, const char *status_line, const char *body);
 
 class Task {
@@ -21,8 +24,11 @@ public:
 
   virtual int execute() = 0;	// Execute the task
   
-  static Task *construct(int client, std::string headers); // GET
-  static Task *construct(int client, std::string headers, std::string body); // POST
+  static Task *construct(int client,
+			 const std::string& headers); // GET
+  static Task *construct(int client,
+			 const std::string& headers,
+			 const std::string& body); // POST
 }; 
 
 class HealthTask : public Task { // GET /health
@@ -91,22 +97,21 @@ public:
 
 class RunTask : public Task { // POST /scripts/<id>/run + args
 private:
-  int job_id;
+  int script_id;
   std::vector<std::string> args;
 public:
-  RunTask(int client, int id, std::vector<std::string> args)
-    : Task(client), job_id(id), args(std::move(args)) {};
+  RunTask(int client, int id, std::vector<std::string>args)
+    : Task(client), script_id(id), args(args) {};
   int execute();
 };
 
 class UploadTask : public Task { // POST /scripts/upload
 private:
-  int script_id;
   std::string filename;
   std::string script;
 public:
-  UploadTask(int client, int id, std::string filename, std::string script)
-    : Task(client), script_id(id), filename(std::move(filename)), script(std::move(script)) {};
+  UploadTask(int client, std::string filename, std::string script)
+    : Task(client), filename(filename), script(script) {};
   int execute();
 };
 

@@ -1,0 +1,4 @@
+TaskFactory.o: TaskFactory.cc Tasks.hh
+Tasks.o: Tasks.cc Tasks.hh
+psirver.o: psirver.cc utils.hh Tasks.hh
+utils.o: utils.cc utils.hh

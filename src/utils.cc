@@ -4,11 +4,8 @@
 #include <fcntl.h>
 #include <iostream>
 #include <syslog.h> 
-#include <unistd.h>   
-#include <sys/types.h>
+
 #include "utils.hh"
-#include <unistd.h>
-#include <sys/types.h>
 
 static constexpr char PID_FILE_NAME[] = "psirver.pid";
 static constexpr char HOME_VAR[] = "PSIRVER_HOME";
@@ -116,27 +113,5 @@ void add_sigint_handler()
     syslog(LOG_ERR, "Sigaction: %s", strerror(errno));
     exit(EXIT_FAILURE);
   }
-} // <--- THIS BRACE CLOSES add_sigint_handler
-
-// --- NOW THE NEW FUNCTIONS START OUTSIDE ---
-
-// This function looks for "filename=" inside the upload data
-std::string extract_filename(const std::string& body) {
-    size_t pos = body.find("filename=\"");
-    if (pos == std::string::npos) return "unknown_script.py";
-    
-    size_t start = pos + 10; // Move past filename="
-    size_t end = body.find("\"", start);
-    return body.substr(start, end - start);
 }
-
-// This function cuts out the extra HTTP headers to get the raw code
-std::string extract_content(const std::string& body) {
-    // In HTTP, headers and body are separated by two newlines (\r\n\r\n)
-    size_t pos = body.find("\r\n\r\n");
-    if (pos == std::string::npos) return body;
-    
-    return body.substr(pos + 4); // The +4 skips the \r\n\r\n
-}
-
 
