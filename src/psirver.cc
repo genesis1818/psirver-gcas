@@ -181,32 +181,32 @@ Task *request2task()
     }
     
     // TODO: move messaging to execute()
-    reply(client, "HTTP/1.1 200 OK", "Hello from Psirver!");
+    //reply(client, "HTTP/1.1 200 OK", "Hello from Psirver!");
     return task;
   }
 
   if(request.compare(0, strlen("POST "), "POST ") == 0) {
-    std::string headers = request.substr(0, header_end_pos);
+  std::string headers = request.substr(0, header_end_pos);
 
-    ssize_t content_length = parse_content_length(client, headers);
-      
-    if (content_length < 0) {
-      return nullptr;
-    }
-
-    std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
-    body = read_body(client, content_length, body);
-
-    Task *task = Task::construct(client, headers, body);    
-    if(!task) {
-      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
-      return nullptr;
-    }
-
-    // TODO: move messaging to execute()
-    reply(client, "HTTP/1.1 200 OK", "Hello from Psirver!");
-    return task;
+  ssize_t content_length = parse_content_length(client, headers);
+    
+  if (content_length < 0) {
+    return nullptr;
   }
+
+  std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
+  body = read_body(client, content_length, body);
+
+  Task *task = Task::construct(client, headers, body);
+
+  if(!task) {
+    reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+    return nullptr;
+  }
+
+  // reply(client, "HTTP/1.1 200 OK", "Hello from Psirver!");
+  return task;
+}
   
   reply(client, "HTTP/1.1 405 Method Not Allowed",
 	(request.substr(0, 0x10) + "...").c_str());
