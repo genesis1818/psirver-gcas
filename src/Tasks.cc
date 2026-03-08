@@ -11,7 +11,7 @@ int HealthTask::execute()
       "\r\n"
       "Running";
 
-  send(client_fd, response.c_str(), response.size(), 0);
+  send(client, response.c_str(), response.size(), 0);
   return 0;
 }
  
@@ -24,7 +24,7 @@ int TeapotTask::execute()
       "\r\n"
       "Running";
 
-  send(client_fd, response.c_str(), response.size(), 0);
+  send(client, response.c_str(), response.size(), 0);
   return 0;
 }
 
