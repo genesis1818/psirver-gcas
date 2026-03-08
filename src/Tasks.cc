@@ -4,15 +4,27 @@
 
 int HealthTask::execute()
 {
-  // --> To be implemented later
-  std::cerr << "I will report health\n";
+  const std::string response =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Length: 7\r\n"
+      "\r\n"
+      "Running";
+
+  send(client_fd, response.c_str(), response.size(), 0);
   return 0;
 }
  
 int TeapotTask::execute()
 {
-  // --> To be implemented later
-  std::cerr << "I am a teapot (maybe)\n";
+  const std::string response =
+      "HTTP/1.1 418 I'm a Teapot\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Length: 7\r\n"
+      "\r\n"
+      "Running";
+
+  send(client_fd, response.c_str(), response.size(), 0);
   return 0;
 }
 
