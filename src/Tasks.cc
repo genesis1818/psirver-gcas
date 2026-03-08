@@ -1,4 +1,5 @@
 #include "Tasks.hh"
+#include <sys/socket.h>
 
 // Do the job, reply to the client, and return to the main loop
 
