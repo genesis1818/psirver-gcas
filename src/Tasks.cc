@@ -45,8 +45,36 @@ int StderrTask::execute()
 
 int DeleteTask::execute()
 {
-  // --> To be implemented later
-  std::cerr << "I will delete script " << script_id << "\n";
+  std::string dir = "scripts/" + std::to_string(script_id);
+
+  DIR *d = opendir(dir.c_str());
+  if (!d) {
+    reply(client, "HTTP/1.1 404 Not Found", "Not Found");
+    return 0;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(d)) != nullptr) {
+    if (entry->d_name[0] == '.') continue;
+
+    std::string path = dir + "/" + entry->d_name;
+    unlink(path.c_str());
+  }
+
+  closedir(d);
+
+  rmdir(dir.c_str());
+
+  std::string body = std::to_string(script_id);
+
+  std::string response =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n" +
+      body;
+
+  send(client, response.c_str(), response.size(), 0);
+
   return 0;
 }
 
