@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <fcntl.h>
 
 // Do the job, reply to the client, and return to the main loop
 
@@ -79,8 +80,36 @@ int StdoutTask::execute()
 
 int UploadTask::execute()
 {
-  // --> To be implemented later
-  std::cerr << "I will upload file " << filename << "; script length " << script.size() << "\n";
+  int id = 1;
+
+  // find smallest unused ID
+  while (true) {
+    std::string dir = "scripts/" + std::to_string(id);
+    if (access(dir.c_str(), F_OK) != 0) {
+      break;
+    }
+    id++;
+  }
+
+  std::string dir = "scripts/" + std::to_string(id);
+  mkdir(dir.c_str(), 0700);
+
+  std::string path = dir + "/" + filename;
+
+  int fd = open(path.c_str(), O_CREAT | O_WRONLY, 0600);
+  write(fd, script.c_str(), script.size());
+  close(fd);
+
+  std::string body = std::to_string(id);
+
+  std::string response =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n" +
+      body;
+
+  send(client, response.c_str(), response.size(), 0);
+
   return 0;
 }
 
