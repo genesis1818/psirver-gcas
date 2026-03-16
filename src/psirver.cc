@@ -11,8 +11,6 @@
 static constexpr ssize_t MAX_REQUEST_SZ = 0x10000;
 
 static constexpr size_t READ_BUFFER_SZ = 0x1000;
-static constexpr char RN[] = "\r\n";
-static constexpr char END_OF_HEADER[] = "\r\n\r\n";
 
 // Global variables (are evil)
 int server_socket;
@@ -37,8 +35,9 @@ void reply(int client, const char *status_line, const char *body)
 
   write(client, headers.data(), headers.size());
   write(client, body, strlen(body));
-  // DO NOT close(client) here.
+  close(client);
 }
+
 // Open the main server socket and prepare it for accepting
 // connections. Library functions used:
 // - htonl()/htons()
@@ -148,71 +147,77 @@ Task *request2task()
     syslog(LOG_ERR, "Accept: %s", strerror(errno));
     return nullptr;
   }
-
-  char buffer[READ_BUFFER_SZ];
+  
+  char buffer[READ_BUFFER_SZ]; 
   size_t header_end_pos = std::string::npos;
   ssize_t chunk_sz;
-
+  
   std::string request;
-
+  
+  // This code may read more data than MAX_REQUEST_SZ
+  // but by no more than the buffer size
   while (request.size() < MAX_REQUEST_SZ &&
-         (chunk_sz = read(client, buffer, sizeof(buffer))) > 0) {
+	 (chunk_sz = read(client, buffer, sizeof(buffer))) > 0) {
     request.append(buffer, chunk_sz);
     header_end_pos = request.find(END_OF_HEADER);
     if (header_end_pos != std::string::npos) {
       break;
     }
   }
-	
-  if (header_end_pos == std::string::npos) {
-  reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
-  close(client);
-  return nullptr;
-}
-
+  
   if (request.size() > MAX_REQUEST_SZ) {
     reply(client, "HTTP/1.1 413 Content Too Large", "Content Too Large");
-    close(client);
     return nullptr;
   }
-
-  if (request.compare(0, strlen("GET "), "GET ") == 0) {
+  
+  if(request.compare(0, strlen("GET "), "GET ") == 0) {
     std::string headers = request.substr(0, header_end_pos);
 
-    Task *t = Task::construct(client, headers);
-    if (!t) close(client);
-    return t;
+    Task *task = Task::construct(client, headers);
+
+    if(!task) {
+      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+      return nullptr;
+    }
+    
+    return task;
   }
 
-  if (request.compare(0, strlen("POST "), "POST ") == 0) {
+  if(request.compare(0, strlen("POST "), "POST ") == 0) {
     std::string headers = request.substr(0, header_end_pos);
 
     ssize_t content_length = parse_content_length(client, headers);
+      
     if (content_length < 0) {
-      close(client);
       return nullptr;
     }
 
     std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
     body = read_body(client, content_length, body);
 
-    Task *t = Task::construct(client, headers, body);
-    if (!t) close(client);
-    return t;
-  }
+    Task *task = Task::construct(client, headers, body);    
+    if(!task) {
+      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+      return nullptr;
+    }
 
+    return task;
+  }
+  
   reply(client, "HTTP/1.1 405 Method Not Allowed",
-        (request.substr(0, 0x10) + "...").c_str());
-  close(client);
+	(request.substr(0, 0x10) + "...").c_str());
   return nullptr;
 }
+
 // SIGINT handler. Will cause a graceful shutdown. Library functions used:
 // - close()
 // - unlink()
 // - syslog()
 // - exit()
-void on_sigint(int /* sig_num */)
+void graceful_shutdown(int /* sig_num */)
 {
+  Script::terminate_all();
+  
   close(server_socket);
   if (unlink(pid_path.c_str()) != 0) {
     syslog(LOG_WARNING, "Unlink(%s): %s", pid_path.c_str(), strerror(errno));
@@ -238,15 +243,17 @@ int main(int argc, char **argv)
   
   // Register a graceful shutdown handler on SIGINT
   add_sigint_handler();
-  
+
   // The main loop
   while(true) { // Not really, but close
     Task *task = request2task();
     
-    // Main processing will happen here, but now all tasks are nullptrs
+    // Main processing happens here
     if (task) {
-      task->execute();
-      delete task;
+      // TODO: convert to a call to std::thread(), followed by a call
+      // to detach()
+      task->execute(); // TODO: put in a thread
+      delete task; // TODO: replace
     }
   }
 

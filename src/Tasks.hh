@@ -4,6 +4,9 @@
 #include <vector>
 #include <unistd.h>
 
+static constexpr char RN[] = "\r\n";
+static constexpr char END_OF_HEADER[] = "\r\n\r\n";
+
 void reply(int client, const char *status_line, const char *body);
 
 class Task {
@@ -20,9 +23,16 @@ public:
   };
 
   virtual int execute() = 0;	// Execute the task
+  void execute_in_thread() {	// Execute and cleanup
+    execute();
+    delete this;
+  }
   
-  static Task *construct(int client, std::string headers); // GET
-  static Task *construct(int client, std::string headers, std::string body); // POST
+  static Task *construct(int client,
+			 const std::string& headers); // GET
+  static Task *construct(int client,
+			 const std::string& headers,
+			 const std::string& body); // POST
 }; 
 
 class HealthTask : public Task { // GET /health
@@ -51,7 +61,7 @@ public:
 
 class DeleteTask : public Task { // GET /scripts/<id>/delete
 private:
-  int script_id;
+  std::size_t script_id;
 public:
   DeleteTask(int client, int id) : Task(client), script_id(id) {};
   int execute();
@@ -59,7 +69,7 @@ public:
 
 class JobStatusTask : public Task { // GET /jobs/<id>
 private:
-  int job_id;
+  std::size_t job_id;
 public:
   JobStatusTask(int client, int id) : Task(client), job_id(id) {};
   int execute();
@@ -67,7 +77,7 @@ public:
 
 class TerminateTask : public Task { // GET /jobs/<id>/terminate
 private:
-  int job_id;
+  std::size_t job_id;
 public:
   TerminateTask(int client, int id) : Task(client), job_id(id) {};
   int execute();
@@ -75,7 +85,7 @@ public:
 
 class StdoutTask : public Task { // GET /jobs/<id>/stdout
 private:
-  int job_id;
+  std::size_t job_id;
 public:
   StdoutTask(int client, int id) : Task(client), job_id(id) {};
   int execute();
@@ -83,7 +93,7 @@ public:
 
 class StderrTask : public Task { // GET /jobs/<id>/stderr
 private:
-  int job_id;
+  std::size_t job_id;
 public:
   StderrTask(int client, int id) : Task(client), job_id(id) {};
   int execute();
@@ -91,22 +101,22 @@ public:
 
 class RunTask : public Task { // POST /scripts/<id>/run + args
 private:
-  int job_id;
+  std::size_t script_id;
   std::vector<std::string> args;
 public:
-  RunTask(int client, int id, std::vector<std::string> args)
-    : Task(client), job_id(id), args(std::move(args)) {};
+  RunTask(int client, int id, std::vector<std::string>args)
+    : Task(client), script_id(id), args(args) {};
   int execute();
 };
 
 class UploadTask : public Task { // POST /scripts/upload
 private:
-  int script_id;
   std::string filename;
   std::string script;
 public:
-  UploadTask(int client, int id, std::string filename, std::string script)
-    : Task(client), script_id(id), filename(std::move(filename)), script(std::move(script)) {};
+  UploadTask(int client, std::string filename, std::string script)
+    : Task(client), filename(filename), script(script) {};
   int execute();
+  void cleanup(std::size_t which, const std::string& msg);
 };
 
