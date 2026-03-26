@@ -225,20 +225,20 @@ static Task *new_run_task(int client,
 			  const std::string& body,
 			  const std::string& rest)
 {
-  std::cerr << "entered new_run_task\n";
-  std::cerr << "HEADERS:\n[" << headers << "]\n";
-  std::cerr << "BODY:\n[" << body << "]\n";
-  std::cerr << "REST:\n[" << rest << "]\n";
+  std::cerr << "entered new_run_task" << std::endl;
+  std::cerr << "HEADERS:\n[" << headers << "]" << std::endl;
+  std::cerr << "BODY:\n[" << body << "]" << std::endl;
+  std::cerr << "REST:\n[" << rest << "]" << std::endl;
 
   const std::size_t slash = rest.find("/");
   if (slash == std::string::npos || slash == 0 || slash + 1 >= rest.size()) {
-    std::cerr << "failed: bad slash parsing\n";
+    std::cerr << "failed: bad slash parsing" << std::endl;
     return nullptr;
   }
 
   auto action = rest.substr(slash + 1);
   if (action != "run") {
-    std::cerr << "failed: action was [" << action << "]\n";
+    std::cerr << "failed: action was [" << action << "]" << std::endl;
     return nullptr;
   }
 
@@ -246,14 +246,14 @@ static Task *new_run_task(int client,
   try {
     script_id = std::stoi(rest.substr(0, slash));
   } catch (...) {
-    std::cerr << "failed: script_id parse\n";
+    std::cerr << "failed: script_id parse" << std::endl;
     return nullptr;
   }
 
   static constexpr char CT[] = "Content-Type: application/x-www-form-urlencoded";
   const std::size_t ct_pos = headers.find(CT);
   if (ct_pos == std::string::npos) {
-    std::cerr << "failed: missing content-type\n";
+    std::cerr << "failed: missing content-type" << std::endl;
     return nullptr;
   }
 
@@ -261,7 +261,7 @@ static Task *new_run_task(int client,
   const size_t ARGS_LEN = sizeof(ARGS) - 1;
   const std::size_t args_pos = body.find(ARGS);
   if (args_pos == std::string::npos) {
-    std::cerr << "failed: missing args=\n";
+    std::cerr << "failed: missing args=" << std::endl;
     return nullptr;
   }
 
@@ -274,7 +274,7 @@ static Task *new_run_task(int client,
   }
 
   std::cerr << "success: script_id=" << script_id
-            << ", num_args=" << args.size() << "\n";
+            << ", num_args=" << args.size() << std::endl;
 
   return new RunTask(client, script_id, args);
 }
@@ -288,27 +288,31 @@ Task *Task::construct(int client,
 		      const std::string& headers,
 		      const std::string& body)
 {
-  // Extract the path
   const std::string path = get_path_from(headers);
   if (path.empty()) {
+    std::cerr << "POST construct failed: empty path" << std::endl;
     return nullptr;
   }
-  
+
+  std::cerr << "POST path: [" << path << "]" << std::endl;
+
   static constexpr char SCRIPTS[] = "/scripts/";
   const std::size_t SCRIPTS_LEN = sizeof(SCRIPTS) - 1;
-  
-  if(path.size() < SCRIPTS_LEN ||
-     path.compare(0, SCRIPTS_LEN, SCRIPTS) != 0) {
-    // Not /scripts
+
+  if (path.size() < SCRIPTS_LEN ||
+      path.compare(0, SCRIPTS_LEN, SCRIPTS) != 0) {
+    std::cerr << "POST construct failed: not under /scripts/" << std::endl;
     return nullptr;
   }
-  
+
   auto action = path.substr(SCRIPTS_LEN);
-  
-  if(action == "upload") {	// /scripts/upload
+  std::cerr << "action after /scripts/: [" << action << "]" << std::endl;
+
+  if (action == "upload") {
+    std::cerr << "dispatching to new_upload_task" << std::endl;
     return new_upload_task(client, headers, body);
   }
-  
-  // /scripts/<id>/run
+
+  std::cerr << "dispatching to new_run_task" << std::endl;
   return new_run_task(client, headers, body, action);
 }
