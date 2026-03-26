@@ -185,10 +185,10 @@ Task *request2task()
     return task;
   }
   if(request.compare(0, strlen("POST "), "POST ") == 0) {
-   std::string headers = request.substr(0, header_end_pos);
+  std::string headers = request.substr(0, header_end_pos);
 
-   std::cerr << "POST request received in request2task" << std::endl;
-   std::cerr << "HEADERS IN request2task:\n[" << headers << "]" << std::endl;
+  std::cerr << "POST request received in request2task" << std::endl;
+  std::cerr << "HEADERS IN request2task:\n[" << headers << "]" << std::endl;
 
   ssize_t content_length = parse_content_length(client, headers);
 
@@ -203,13 +203,14 @@ Task *request2task()
   std::cerr << "BODY IN request2task:\n[" << body << "]" << std::endl;
 
   Task *task = Task::construct(client, headers, body);
+
   if(!task) {
     std::cerr << "Task::construct returned nullptr" << std::endl;
     reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
     return nullptr;
+  }
 
-
-    return task;
+  return task;
   }
   
   reply(client, "HTTP/1.1 405 Method Not Allowed",
