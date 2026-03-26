@@ -4,6 +4,7 @@
 #include <syslog.h> 
 #include <unistd.h>
 #include <thread>
+#include <iostream>
 
 #include "utils.hh"
 #include "Tasks.hh"
@@ -183,24 +184,30 @@ Task *request2task()
     
     return task;
   }
-
   if(request.compare(0, strlen("POST "), "POST ") == 0) {
-    std::string headers = request.substr(0, header_end_pos);
+   std::string headers = request.substr(0, header_end_pos);
 
-    ssize_t content_length = parse_content_length(client, headers);
-      
-    if (content_length < 0) {
-      return nullptr;
-    }
+   std::cerr << "POST request received in request2task" << std::endl;
+   std::cerr << "HEADERS IN request2task:\n[" << headers << "]" << std::endl;
 
-    std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
-    body = read_body(client, content_length, body);
+  ssize_t content_length = parse_content_length(client, headers);
 
-    Task *task = Task::construct(client, headers, body);    
-    if(!task) {
-      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
-      return nullptr;
-    }
+  if (content_length < 0) {
+    std::cerr << "parse_content_length failed" << std::endl;
+    return nullptr;
+  }
+
+  std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
+  body = read_body(client, content_length, body);
+
+  std::cerr << "BODY IN request2task:\n[" << body << "]" << std::endl;
+
+  Task *task = Task::construct(client, headers, body);
+  if(!task) {
+    std::cerr << "Task::construct returned nullptr" << std::endl;
+    reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+    return nullptr;
+
 
     return task;
   }
