@@ -400,6 +400,10 @@ int RunTask::execute()
     std::vector<std::string> argv_strings;
     argv_strings.push_back("python3");
     argv_strings.push_back(script_filename);
+	  for (const auto &a : args) {
+  argv_strings.push_back(a);
+}
+	  
 
     // Add script arguments here.
     // If args is a vector<string>, do:
