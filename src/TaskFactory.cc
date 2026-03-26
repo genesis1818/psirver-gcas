@@ -1,6 +1,7 @@
 #include <unordered_map>
 #include <functional>
 #include <sstream>
+#include <iostream>
 #include "Tasks.hh"
 
 // Task factory (Factory Method pattern,
@@ -224,52 +225,57 @@ static Task *new_run_task(int client,
 			  const std::string& body,
 			  const std::string& rest)
 {
+  std::cerr << "entered new_run_task\n";
+  std::cerr << "HEADERS:\n[" << headers << "]\n";
+  std::cerr << "BODY:\n[" << body << "]\n";
+  std::cerr << "REST:\n[" << rest << "]\n";
+
   const std::size_t slash = rest.find("/");
-  if(slash == std::string::npos || slash == 0 || slash + 1 >= rest.size()) {
+  if (slash == std::string::npos || slash == 0 || slash + 1 >= rest.size()) {
+    std::cerr << "failed: bad slash parsing\n";
     return nullptr;
   }
+
   auto action = rest.substr(slash + 1);
-  
-  if (action != "run") {    
+  if (action != "run") {
+    std::cerr << "failed: action was [" << action << "]\n";
     return nullptr;
   }
-  
+
   int script_id;
   try {
     script_id = std::stoi(rest.substr(0, slash));
   } catch (...) {
+    std::cerr << "failed: script_id parse\n";
     return nullptr;
   }
-  
-  // Content-Type: application/x-www-form-urlencoded
-  // Body:
-  // args=arg1,arg2,arg3
 
-  // Confirm the content type
   static constexpr char CT[] = "Content-Type: application/x-www-form-urlencoded";
   const std::size_t ct_pos = headers.find(CT);
-  if(ct_pos == std::string::npos) {
+  if (ct_pos == std::string::npos) {
+    std::cerr << "failed: missing content-type\n";
     return nullptr;
   }
-  
-  // Extract the arglist from the body
-  static constexpr char ARGS[] = "args=";  
-  const size_t ARGS_LEN = sizeof(ARGS) - 1;  
+
+  static constexpr char ARGS[] = "args=";
+  const size_t ARGS_LEN = sizeof(ARGS) - 1;
   const std::size_t args_pos = body.find(ARGS);
-  if(args_pos == std::string::npos) {
+  if (args_pos == std::string::npos) {
+    std::cerr << "failed: missing args=\n";
     return nullptr;
   }
-  
-  // Comma-separated list
-  // We assume that arguments do not have commas
-  std::vector<std::string>args;
-  args.reserve(10);		// A random guess
+
+  std::vector<std::string> args;
+  args.reserve(10);
   std::stringstream arglist(body.substr(args_pos + ARGS_LEN));
   std::string item;
   while (std::getline(arglist, item, ',')) {
     args.push_back(item);
   }
-  
+
+  std::cerr << "success: script_id=" << script_id
+            << ", num_args=" << args.size() << "\n";
+
   return new RunTask(client, script_id, args);
 }
 
