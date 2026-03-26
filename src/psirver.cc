@@ -88,30 +88,37 @@ int init_socket(uint16_t port)
 
 static ssize_t parse_content_length(int client, std::string headers)
 {
-  constexpr char CL[] = "Content-Length: ";
+constexpr char CL[] = "Content-Length: ";
   size_t pos = headers.find(CL);
   if (pos == std::string::npos) {
     reply(client, "HTTP/1.1 411 Length Required", "Length Required");
     return -1;
   }
-  
-  std::string rest = headers.substr(pos + sizeof CL - 1);
-  size_t content_length_end = rest.find("\n");
-  if (content_length_end == std::string::npos) {
+
+  size_t value_start = pos + sizeof(CL) - 1;
+
+  // Content-Length may be the last header line, so there may be no '\n'
+  size_t value_end = headers.find("\r", value_start);
+  if (value_end == std::string::npos) {
+    value_end = headers.size();
+  }
+
+  std::string content_length_str = headers.substr(value_start,
+                                                  value_end - value_start);
+
+  try {
+    size_t content_length = std::stoi(content_length_str);
+
+    if (content_length > MAX_REQUEST_SZ) {
+      reply(client, "HTTP/1.1 413 Content Too Large", "Content Too Large");
+      return -1;
+    }
+
+    return content_length;
+  } catch (...) {
     reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
     return -1;
   }
-  
-  std::string content_length_str = headers.substr(pos + sizeof CL - 1,
-						  content_length_end);
-  size_t content_length = std::stoi(content_length_str);
-  
-  if (content_length > MAX_REQUEST_SZ) {
-    reply(client, "HTTP/1.1 413 Content Too Large", "Content Too Large");
-    return -1;
-  }
-
-  return content_length;
 }
 
 // Given the content length and the pre-read body, read the whole
