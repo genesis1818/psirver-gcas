@@ -235,28 +235,27 @@ int main(int argc, char **argv)
   uint16_t server_port = select_port(argc, argv);
 
   // Initialize the server socket
-  if(init_socket(server_port) < 0 || server_socket < 0) {
+  if (init_socket(server_port) < 0 || server_socket < 0) {
     return EXIT_FAILURE;
   }
 
   // Create $(PSIRVER_HOME)/psirver.pid
   pid_path = init_pid_file();
-  
+
   // Register a graceful shutdown handler on SIGINT
   add_sigint_handler();
 
   // The main loop
-  while(true) { // Not really, but close
+  while (true) { // Not really, but close
     Task *task = request2task();
-    
+
     // Main processing happens here
     if (task) {
-  std::thread t([task]() {
-    task->execute();
-    delete task;
-  });
-  t.detach();
-}
+      std::thread t([task]() {
+        task->execute();
+        delete task;
+      });
+      t.detach();
     }
   }
 
