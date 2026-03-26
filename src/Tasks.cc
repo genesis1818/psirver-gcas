@@ -171,18 +171,21 @@ void UploadTask::cleanup(std::size_t which, const std::string &msg)
 {
   // TODO: lock `script_mutex`
 
-  // Find the next available script ID
-  std::size_t script_id = 0;
+ std::size_t script_id = 0;
+{
+  std::lock_guard<std::mutex> lock(script_mutex);
+
   for (; script_id < scripts.size() && scripts[script_id]; ++script_id) {
     // Do nothing
   }
 
   Script *s = new Script(script_id, filename);
-  if(script_id == scripts.size()) {
+  if (script_id == scripts.size()) {
     scripts.emplace_back(s);
   } else {
     scripts[script_id].reset(s);
   }
+}
   
   // TODO: unlock `script_mutex`
 
@@ -269,15 +272,17 @@ void UploadTask::cleanup(std::size_t which, const std::string &msg)
 
 int ScriptListTask::execute()
 {
-  std::string listing;
+   std::string listing;
 
-  // TODO: lock `script_mutex`
+  {
+    std::lock_guard<std::mutex> lock(script_mutex);
 
-  for (std::size_t i = 0; i < scripts.size(); ++i) {
-    if (scripts[i]) {
-      const std::string line = scripts[i]->format();
-      if (!line.empty()) {
-	listing += line + "\n";
+    for (std::size_t i = 0; i < scripts.size(); ++i) {
+      if (scripts[i]) {
+        const std::string line = scripts[i]->format();
+        if (!line.empty()) {
+          listing += line + "\n";
+        }
       }
     }
   }
@@ -322,20 +327,22 @@ int DeleteTask::execute()
 {
   // TODO: lock `script_mutex`
   
-  if (script_id >= scripts.size() || !scripts[script_id]) {
-    // TODO: unlock `script_mutex`
-    reply(client, "HTTP/1.1 404 Not Found", "Not Found");
-    return 1;
+  std::string script_dir;
+  std::string script_filename;
+
+  {
+    std::lock_guard<std::mutex> lock(script_mutex);
+
+    if (script_id >= scripts.size() || !scripts[script_id]) {
+      reply(client, "HTTP/1.1 404 Not Found", "Not Found");
+      return 1;
+    }
+
+    script_dir = std::string(SCRIPTS_PATH) + std::to_string(script_id);
+    script_filename = script_dir + "/" + scripts[script_id]->get_name();
+
+    scripts[script_id].reset();
   }
-
-  const std::string script_dir =
-    std::string(SCRIPTS_PATH) + std::to_string(script_id);
-  const std::string script_filename =
-    script_dir + "/" + scripts[script_id]->get_name();
-
-  scripts[script_id].reset();
-
-  // TODO: unlock `script_mutex`
 
   if (   ::chmod(script_dir.c_str(), S_IRWXU) != 0
       || ::chmod(script_filename.c_str(), S_IWUSR) != 0
@@ -355,18 +362,23 @@ int DeleteTask::execute()
 
 int RunTask::execute()
 {
-  if(scripts[script_id] == nullptr) {
-    reply(client, "HTTP/1.1 404 Not found", "Not found");
-    return 1;
+  std::string script_dir;
+  std::string script_filename;
+
+  {
+    std::lock_guard<std::mutex> lock(script_mutex);
+
+    if (script_id >= scripts.size() || scripts[script_id] == nullptr) {
+      reply(client, "HTTP/1.1 404 Not found", "Not found");
+      return 1;
+    }
+
+    script_dir = std::string(SCRIPTS_PATH) + std::to_string(script_id);
+    script_filename = script_dir + "/" + scripts[script_id]->get_name();
   }
 
-  const std::string script_dir =
-      std::string(SCRIPTS_PATH) + std::to_string(script_id);
-  const std::string script_filename =
-    script_dir + "/" + scripts[script_id]->get_name();
+  // TODO
 
-  // TODO 
-    
   reply(client, "HTTP/1.1 200 OK", "OK");
   return 0;
 }
