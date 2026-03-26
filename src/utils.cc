@@ -12,7 +12,7 @@
 #include "utils.hh"
 
 static constexpr char PID_FILE_NAME[] = "psirver.pid";
-static constexpr char HOME_VAR[] = "PSIRVER_HOME";
+//static constexpr char HOME_VAR[] = "PSIRVER_HOME";
 
 static constexpr uint16_t DEFAULT_PORT = 8000;
 
