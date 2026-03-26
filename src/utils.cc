@@ -3,12 +3,16 @@
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
-#include <syslog.h> 
+#include <syslog.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <cerrno>
+#include <cstdlib>
 
 #include "utils.hh"
 
 static constexpr char PID_FILE_NAME[] = "psirver.pid";
-// static constexpr char HOME_VAR[] = "PSIRVER_HOME";
+static constexpr char HOME_VAR[] = "PSIRVER_HOME";
 
 static constexpr uint16_t DEFAULT_PORT = 8000;
 
