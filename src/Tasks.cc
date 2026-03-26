@@ -10,6 +10,9 @@
 #include "Tasks.hh"
 #include "utils.hh"
 #include <mutex>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
 static std::vector<std::unique_ptr<Script>> scripts;
 
