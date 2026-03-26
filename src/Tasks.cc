@@ -370,7 +370,7 @@ int RunTask::execute()
     std::lock_guard<std::mutex> lock(script_mutex);
 
     if (script_id >= scripts.size() || scripts[script_id] == nullptr) {
-      reply(client, "HTTP/1.1 404 Not found", "Not found");
+      reply(client, "HTTP/1.1 404 Not Found", "Not Found");
       return 1;
     }
 
@@ -378,7 +378,53 @@ int RunTask::execute()
     script_filename = script_dir + "/" + scripts[script_id]->get_name();
   }
 
-  // TODO
+  pid_t pid = fork();
+  if (pid < 0) {
+    syslog(LOG_ERR, "fork: %s", strerror(errno));
+    reply(client, "HTTP/1.1 500 Internal Server Error",
+          "Internal Server Error");
+    return 1;
+  }
+
+  if (pid == 0) {
+    // Child: run python script_filename [args...]
+
+    // If args is a single std::string:
+    // std::vector<std::string> tokens = split_args(args);
+
+    // If args is already a std::vector<std::string>, use it directly.
+
+    std::vector<std::string> argv_strings;
+    argv_strings.push_back("python3");
+    argv_strings.push_back(script_filename);
+
+    // Add script arguments here.
+    // If args is a vector<string>, do:
+    // for (const auto &a : args) argv_strings.push_back(a);
+
+    // If args is one string and you haven't written a parser yet,
+    // leave it out for now to get the basic run working first.
+
+    std::vector<char*> argv_ptrs;
+    for (auto &s : argv_strings) {
+      argv_ptrs.push_back(const_cast<char*>(s.c_str()));
+    }
+    argv_ptrs.push_back(nullptr);
+
+    execvp("python3", argv_ptrs.data());
+
+    // Only reached if execvp fails
+    syslog(LOG_ERR, "execvp: %s", strerror(errno));
+    _exit(1);
+  }
+
+  // Parent
+  if (wait4(pid, nullptr, 0, nullptr) < 0) {
+    syslog(LOG_ERR, "wait4: %s", strerror(errno));
+    reply(client, "HTTP/1.1 500 Internal Server Error",
+          "Internal Server Error");
+    return 1;
+  }
 
   reply(client, "HTTP/1.1 200 OK", "OK");
   return 0;
