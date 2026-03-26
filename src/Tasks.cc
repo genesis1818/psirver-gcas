@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include "Tasks.hh"
 #include "utils.hh"
+#include <mutex>
 
 static std::vector<std::unique_ptr<Script>> scripts;
 
