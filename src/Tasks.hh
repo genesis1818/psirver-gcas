@@ -4,6 +4,21 @@
 #include <vector>
 #include <unistd.h>
 
+enum JobStatus {
+  RUNNING,
+  FINISHED,
+  FAILED,
+  TERMINATED
+};
+
+struct Job {
+  std::size_t id;
+  pid_t pid;
+  JobStatus status;
+  std::string stdout_output;
+  std::string stderr_output;
+};
+
 static constexpr char RN[] = "\r\n";
 static constexpr char END_OF_HEADER[] = "\r\n\r\n";
 
