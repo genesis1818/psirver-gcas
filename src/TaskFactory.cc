@@ -73,7 +73,7 @@ Task *Task::construct(int client, const std::string& headers)
   const std::size_t JOBS_LEN = sizeof(JOBS) - 1;
   if(path.compare(0, JOBS_LEN, JOBS) == 0) {
     const std::string rest = path.substr(JOBS_LEN);
-    if(rest[0] != '/') {
+    if(rest.empty() || rest[0] != '/') {
       return nullptr;
     }
     
@@ -116,7 +116,7 @@ Task *Task::construct(int client, const std::string& headers)
   const std::size_t SCRIPTS_LEN = sizeof(SCRIPTS) - 1;
   if(path.compare(0, SCRIPTS_LEN, SCRIPTS) == 0) {
     std::string rest = path.substr(SCRIPTS_LEN);
-    if(rest[0] != '/') {
+    if(rest.empty() || rest[0] != '/') {
       return nullptr;
     }
     
