@@ -198,9 +198,48 @@ Task *request2task()
   }
 if(request.compare(0, strlen("POST "), "POST ") == 0) {
   std::string headers = request.substr(0, header_end_pos);
+  std::string path = headers.substr(strlen("POST "));
+
+  size_t space_pos = path.find(' ');
+  if (space_pos == std::string::npos) {
+    reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+    return nullptr;
+  }
+  path = path.substr(0, space_pos);
+
+  if (path != "/scripts/upload") {
+    static constexpr char PREFIX[] = "/scripts/";
+    const size_t PREFIX_LEN = sizeof(PREFIX) - 1;
+
+    if (path.compare(0, PREFIX_LEN, PREFIX) != 0) {
+      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+      return nullptr;
+    }
+
+    std::string rest = path.substr(PREFIX_LEN);
+    size_t slash = rest.find('/');
+    if (slash == std::string::npos || slash == 0) {
+      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+      return nullptr;
+    }
+
+    std::string id_part = rest.substr(0, slash);
+    std::string action = rest.substr(slash + 1);
+
+    try {
+      std::stoi(id_part);
+    } catch (...) {
+      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+      return nullptr;
+    }
+
+    if (action != "run") {
+      reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+      return nullptr;
+    }
+  }
 
   ssize_t content_length = parse_content_length(client, headers);
-
   if (content_length < 0) {
     return nullptr;
   }
