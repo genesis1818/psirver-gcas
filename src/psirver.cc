@@ -201,7 +201,7 @@ Task *request2task()
     return nullptr;
   }
 
-  std::string body = request.substr(header_end_pos + sizeof END_OF_HEADER - 1);
+  body = request.substr(header_end_pos + strlen(END_OF_HEADER));
   body = read_body(client, content_length, body);
 
 
