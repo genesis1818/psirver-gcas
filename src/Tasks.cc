@@ -370,7 +370,6 @@ int DeleteTask::execute()
 
 int RunTask::execute()
 {
-  std::string script_dir;
   std::string script_filename;
 
   {
@@ -381,43 +380,25 @@ int RunTask::execute()
       return 1;
     }
 
-    script_dir = std::string(SCRIPTS_PATH) + std::to_string(script_id);
+    std::string script_dir = std::string(SCRIPTS_PATH) + std::to_string(script_id);
     script_filename = script_dir + "/" + scripts[script_id]->get_name();
   }
 
-  // ✅ CREATE JOB
-  std::size_t job_id;
-  {
-    std::lock_guard<std::mutex> lock(jobs_mutex);
-    Job job;
-    job.id = next_job_id++;
-    job.status = RUNNING;
-    jobs.push_back(job);
-    job_id = job.id;
-  }
-
-  int stdout_pipe[2];
-  int stderr_pipe[2];
-  pipe(stdout_pipe);
-  pipe(stderr_pipe);
-
   pid_t pid = fork();
 
+  if (pid < 0) {
+    reply(client, "HTTP/1.1 500 Internal Server Error", "Internal Server Error");
+    return 1;
+  }
+
   if (pid == 0) {
-    // CHILD
-
-    dup2(stdout_pipe[1], STDOUT_FILENO);
-    dup2(stderr_pipe[1], STDERR_FILENO);
-
-    close(stdout_pipe[0]);
-    close(stderr_pipe[0]);
-
     std::vector<char*> argv;
     argv.push_back(const_cast<char*>("python3"));
     argv.push_back(const_cast<char*>(script_filename.c_str()));
 
-    for (auto &a : args)
+    for (auto &a : args) {
       argv.push_back(const_cast<char*>(a.c_str()));
+    }
 
     argv.push_back(nullptr);
 
@@ -425,39 +406,9 @@ int RunTask::execute()
     _exit(1);
   }
 
-  // PARENT
-  close(stdout_pipe[1]);
-  close(stderr_pipe[1]);
+  wait4(pid, nullptr, 0, nullptr);
 
-  {
-    std::lock_guard<std::mutex> lock(jobs_mutex);
-    jobs.back().pid = pid;
-  }
-
-  // (simple version) read stdout
-  char buffer[1024];
-  ssize_t count;
-
-  while ((count = read(stdout_pipe[0], buffer, sizeof(buffer))) > 0) {
-    std::lock_guard<std::mutex> lock(jobs_mutex);
-    jobs.back().stdout_output.append(buffer, count);
-  }
-
-  // mark finished
-  {
-    std::lock_guard<std::mutex> lock(jobs_mutex);
-    jobs.back().status = FINISHED;
-  }
-
-  // ✅ RETURN 303 REDIRECT
-  std::string location = "/jobs/" + std::to_string(job_id);
-
-  std::string response =
-    "HTTP/1.1 303 See Other\r\n"
-    "Location: " + location + "\r\n\r\n";
-
-  write(client, response.c_str(), response.size());
-
+  reply(client, "HTTP/1.1 200 OK", "OK");
   return 0;
 }
 
@@ -478,7 +429,7 @@ int JobListTask::execute() {
     body += "\n";
   }
 
-  reply(client, "200 OK", body.c_str());
+  reply(client, "HTTP/1.1 200 OK", body.c_str());
   return 0;
 }
 
@@ -488,12 +439,12 @@ int JobStatusTask::execute() {
   for (auto &job : jobs) {
     if (job.id == job_id) {
       std::string body = "Job " + std::to_string(job.id);
-      reply(client, "200 OK", body.c_str());
+      reply(client, "HTTP/1.1 200 OK", body.c_str());
       return 0;
     }
   }
 
-  reply(client, "404 Not Found", "Job not found");
+  reply(client, "HTTP/1.1 404 Not Found", "Job not found");
   return 1;
 }
 
@@ -507,12 +458,12 @@ int TerminateTask::execute() {
       kill(job.pid, SIGTERM);
       job.status = TERMINATED;
 
-      reply(client, "200 OK", "Job terminated");
+      reply(client, "HTTP/1.1 200 OK", body.c_str());
       return 0;
     }
   }
 
-  reply(client, "404 Not Found", "Job not found");
+  reply(client, "HTTP/1.1 404 Not Found", "Job not found");
   return 1;
 }
 
@@ -521,12 +472,12 @@ int StderrTask::execute() {
 
   for (auto &job : jobs) {
     if (job.id == job_id) {
-      reply(client, "200 OK", job.stderr_output.c_str());
+      reply(client, "HTTP/1.1 200 OK", job.stderr_output.c_str());
       return 0;
     }
   }
 
-  reply(client, "404 Not Found", "Job not found");
+  reply(client, "HTTP/1.1 404 Not Found", "Job not found");
   return 1;
 }
 
@@ -535,12 +486,12 @@ int StdoutTask::execute() {
 
   for (auto &job : jobs) {
     if (job.id == job_id) {
-      reply(client, "200 OK", job.stdout_output.c_str());
+      reply(client, "HTTP/1.1 200 OK", job.stdout_output.c_str());
       return 0;
     }
   }
 
-  reply(client, "404 Not Found", "Job not found");
+  reply(client, "HTTP/1.1 404 Not Found", "Job not found");
   return 1;
 }
 
