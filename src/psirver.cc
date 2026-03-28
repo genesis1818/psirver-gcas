@@ -178,6 +178,11 @@ Task *request2task()
     reply(client, "HTTP/1.1 413 Content Too Large", "Content Too Large");
     return nullptr;
   }
+
+	if (header_end_pos == std::string::npos) {
+  reply(client, "HTTP/1.1 400 Bad Request", "Bad Request");
+  return nullptr;
+}
   
   if(request.compare(0, strlen("GET "), "GET ") == 0) {
     std::string headers = request.substr(0, header_end_pos);
@@ -191,9 +196,8 @@ Task *request2task()
     
     return task;
   }
-  if(request.compare(0, strlen("POST "), "POST ") == 0) {
+if(request.compare(0, strlen("POST "), "POST ") == 0) {
   std::string headers = request.substr(0, header_end_pos);
-
 
   ssize_t content_length = parse_content_length(client, headers);
 
@@ -201,9 +205,8 @@ Task *request2task()
     return nullptr;
   }
 
-  body = request.substr(header_end_pos + strlen(END_OF_HEADER));
+  std::string body = request.substr(header_end_pos + strlen(END_OF_HEADER));
   body = read_body(client, content_length, body);
-
 
   Task *task = Task::construct(client, headers, body);
 
@@ -242,25 +245,18 @@ void graceful_shutdown(int /* sig_num */)
 
 int main(int argc, char **argv)
 {
-  // Select the server port
   uint16_t server_port = select_port(argc, argv);
 
-  // Initialize the server socket
   if (init_socket(server_port) < 0 || server_socket < 0) {
     return EXIT_FAILURE;
   }
 
-  // Create $(PSIRVER_HOME)/psirver.pid
   pid_path = init_pid_file();
-
-  // Register a graceful shutdown handler on SIGINT
   add_sigint_handler();
 
-  // The main loop
-  while (true) { // Not really, but close
+  while (true) {
     Task *task = request2task();
 
-    // Main processing happens here
     if (task) {
       std::thread t([task]() {
         task->execute();
@@ -268,6 +264,9 @@ int main(int argc, char **argv)
       });
       t.detach();
     }
+  }
+
+  return EXIT_SUCCESS;
   }
 
   // Create $(PSIRVER_HOME)/psirver.pid
