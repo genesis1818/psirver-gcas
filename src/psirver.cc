@@ -269,25 +269,3 @@ int main(int argc, char **argv)
   return EXIT_SUCCESS;
   }
 
-  // Create $(PSIRVER_HOME)/psirver.pid
-  pid_path = init_pid_file();
-
-  // Register a graceful shutdown handler on SIGINT
-  add_sigint_handler();
-
-  // The main loop
-  while (true) { // Not really, but close
-    Task *task = request2task();
-
-    // Main processing happens here
-    if (task) {
-      std::thread t([task]() {
-        task->execute();
-        delete task;
-      });
-      t.detach();
-    }
-  }
-
-  return EXIT_SUCCESS;
-}
