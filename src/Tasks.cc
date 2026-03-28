@@ -14,6 +14,10 @@
 #include <unistd.h>
 #include <vector>
 
+std::vector<Job> jobs;
+std::mutex jobs_mutex;
+std::size_t next_job_id = 1;
+
 static std::vector<std::unique_ptr<Script>> scripts;
 
 // Used for locking and unlocking the `scripts` vector
