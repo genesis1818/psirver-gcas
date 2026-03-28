@@ -413,7 +413,7 @@ int RunTask::execute()
 }
 
 int JobListTask::execute() {
-  std::lock_guard<std::mutex> lock(jobs_mutex);
+std::lock_guard<std::mutex> lock(jobs_mutex);
 
   std::string body;
   for (auto &job : jobs) {
@@ -458,7 +458,7 @@ int TerminateTask::execute() {
       kill(job.pid, SIGTERM);
       job.status = TERMINATED;
 
-      reply(client, "HTTP/1.1 200 OK", body.c_str());
+      reply(client, "HTTP/1.1 200 OK", "Job terminated");
       return 0;
     }
   }
