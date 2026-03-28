@@ -239,9 +239,7 @@ void graceful_shutdown(int /* sig_num */)
 
 // The main workhorse. Library functions used:
 // - none
-int main(int argc, char **argv)
-{
-  // Select the server port
+
 int main(int argc, char **argv)
 {
   // Select the server port
