@@ -385,99 +385,162 @@ int RunTask::execute()
     script_filename = script_dir + "/" + scripts[script_id]->get_name();
   }
 
-  pid_t pid = fork();
-  if (pid < 0) {
-    syslog(LOG_ERR, "fork: %s", strerror(errno));
-    reply(client, "HTTP/1.1 500 Internal Server Error",
-          "Internal Server Error");
-    return 1;
+  // ✅ CREATE JOB
+  std::size_t job_id;
+  {
+    std::lock_guard<std::mutex> lock(jobs_mutex);
+    Job job;
+    job.id = next_job_id++;
+    job.status = RUNNING;
+    jobs.push_back(job);
+    job_id = job.id;
   }
 
+  int stdout_pipe[2];
+  int stderr_pipe[2];
+  pipe(stdout_pipe);
+  pipe(stderr_pipe);
+
+  pid_t pid = fork();
+
   if (pid == 0) {
-    // Child: run python script_filename [args...]
+    // CHILD
 
-    // If args is a single std::string:
-    // std::vector<std::string> tokens = split_args(args);
+    dup2(stdout_pipe[1], STDOUT_FILENO);
+    dup2(stderr_pipe[1], STDERR_FILENO);
 
-    // If args is already a std::vector<std::string>, use it directly.
+    close(stdout_pipe[0]);
+    close(stderr_pipe[0]);
 
-    std::vector<std::string> argv_strings;
-    argv_strings.push_back("python3");
-    argv_strings.push_back(script_filename);
-	  for (const auto &a : args) {
-  argv_strings.push_back(a);
-}
-	  
+    std::vector<char*> argv;
+    argv.push_back(const_cast<char*>("python3"));
+    argv.push_back(const_cast<char*>(script_filename.c_str()));
 
-    // Add script arguments here.
-    // If args is a vector<string>, do:
-    // for (const auto &a : args) argv_strings.push_back(a);
+    for (auto &a : args)
+      argv.push_back(const_cast<char*>(a.c_str()));
 
-    // If args is one string and you haven't written a parser yet,
-    // leave it out for now to get the basic run working first.
+    argv.push_back(nullptr);
 
-    std::vector<char*> argv_ptrs;
-    for (auto &s : argv_strings) {
-      argv_ptrs.push_back(const_cast<char*>(s.c_str()));
-    }
-    argv_ptrs.push_back(nullptr);
-
-    execvp("python3", argv_ptrs.data());
-
-    // Only reached if execvp fails
-    syslog(LOG_ERR, "execvp: %s", strerror(errno));
+    execvp("python3", argv.data());
     _exit(1);
   }
 
-  // Parent
-  if (wait4(pid, nullptr, 0, nullptr) < 0) {
-    syslog(LOG_ERR, "wait4: %s", strerror(errno));
-    reply(client, "HTTP/1.1 500 Internal Server Error",
-          "Internal Server Error");
-    return 1;
+  // PARENT
+  close(stdout_pipe[1]);
+  close(stderr_pipe[1]);
+
+  {
+    std::lock_guard<std::mutex> lock(jobs_mutex);
+    jobs.back().pid = pid;
   }
 
-  reply(client, "HTTP/1.1 200 OK", "OK");
+  // (simple version) read stdout
+  char buffer[1024];
+  ssize_t count;
+
+  while ((count = read(stdout_pipe[0], buffer, sizeof(buffer))) > 0) {
+    std::lock_guard<std::mutex> lock(jobs_mutex);
+    jobs.back().stdout_output.append(buffer, count);
+  }
+
+  // mark finished
+  {
+    std::lock_guard<std::mutex> lock(jobs_mutex);
+    jobs.back().status = FINISHED;
+  }
+
+  // ✅ RETURN 303 REDIRECT
+  std::string location = "/jobs/" + std::to_string(job_id);
+
+  std::string response =
+    "HTTP/1.1 303 See Other\r\n"
+    "Location: " + location + "\r\n\r\n";
+
+  write(client, response.c_str(), response.size());
+
   return 0;
 }
 
-int JobListTask::execute()
-{
-  // --> To be implemented later
-  std::cerr << "I will report list of jobs\n";
-  reply(client, "HTTP/1.1 200 OK", "OK");
+int JobListTask::execute() {
+  std::lock_guard<std::mutex> lock(jobs_mutex);
+
+  std::string body;
+  for (auto &job : jobs) {
+    body += std::to_string(job.id) + " ";
+    
+    switch (job.status) {
+      case RUNNING: body += "RUNNING"; break;
+      case FINISHED: body += "FINISHED"; break;
+      case FAILED: body += "FAILED"; break;
+      case TERMINATED: body += "TERMINATED"; break;
+    }
+
+    body += "\n";
+  }
+
+  reply(client, "200 OK", body.c_str());
   return 0;
 }
 
-int JobStatusTask::execute()
-{
-  // --> To be implemented later
-  std::cerr << "I will report status of job " << job_id << "\n";
-  reply(client, "HTTP/1.1 200 OK", "OK");
-  return 0;
-};
+int JobStatusTask::execute() {
+  std::lock_guard<std::mutex> lock(jobs_mutex);
 
-int TerminateTask::execute()
-{
-  // --> To be implemented later
-  std::cerr << "I will terminate job " << job_id << "\n";
-  reply(client, "HTTP/1.1 200 OK", "OK");
-  return 0;
+  for (auto &job : jobs) {
+    if (job.id == job_id) {
+      std::string body = "Job " + std::to_string(job.id);
+      reply(client, "200 OK", body.c_str());
+      return 0;
+    }
+  }
+
+  reply(client, "404 Not Found", "Job not found");
+  return 1;
 }
 
-int StderrTask::execute()
-{
-  // --> To be implemented later
-  std::cerr << "I will report stderr of job " << job_id << "\n";
-  reply(client, "HTTP/1.1 200 OK", "OK");
-  return 0;
+#include <signal.h>
+
+int TerminateTask::execute() {
+  std::lock_guard<std::mutex> lock(jobs_mutex);
+
+  for (auto &job : jobs) {
+    if (job.id == job_id) {
+      kill(job.pid, SIGTERM);
+      job.status = TERMINATED;
+
+      reply(client, "200 OK", "Job terminated");
+      return 0;
+    }
+  }
+
+  reply(client, "404 Not Found", "Job not found");
+  return 1;
 }
 
-int StdoutTask::execute()
-{
-  // --> To be implemented later
-  std::cerr << "I will report stdout of job " << job_id << "\n";
-  reply(client, "HTTP/1.1 200 OK", "OK");
-  return 0;
-} 
+int StderrTask::execute() {
+  std::lock_guard<std::mutex> lock(jobs_mutex);
+
+  for (auto &job : jobs) {
+    if (job.id == job_id) {
+      reply(client, "200 OK", job.stderr_output.c_str());
+      return 0;
+    }
+  }
+
+  reply(client, "404 Not Found", "Job not found");
+  return 1;
+}
+
+int StdoutTask::execute() {
+  std::lock_guard<std::mutex> lock(jobs_mutex);
+
+  for (auto &job : jobs) {
+    if (job.id == job_id) {
+      reply(client, "200 OK", job.stdout_output.c_str());
+      return 0;
+    }
+  }
+
+  reply(client, "404 Not Found", "Job not found");
+  return 1;
+}
 
