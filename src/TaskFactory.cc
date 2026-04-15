@@ -1,7 +1,6 @@
 #include <unordered_map>
 #include <functional>
 #include <sstream>
-#include <iostream>
 #include "Tasks.hh"
 
 // Task factory (Factory Method pattern,
@@ -73,7 +72,7 @@ Task *Task::construct(int client, const std::string& headers)
   const std::size_t JOBS_LEN = sizeof(JOBS) - 1;
   if(path.compare(0, JOBS_LEN, JOBS) == 0) {
     const std::string rest = path.substr(JOBS_LEN);
-    if(rest.empty() || rest[0] != '/') {
+    if(rest[0] != '/') {
       return nullptr;
     }
     
@@ -99,6 +98,7 @@ Task *Task::construct(int client, const std::string& headers)
       {"stderr",    [](int client, int job){ return new StderrTask(client, job); }},
       {"stdout",    [](int client, int job){ return new StdoutTask(client, job); }},
       {"terminate", [](int client, int job){ return new TerminateTask(client, job); }},
+      {"purge",     [](int client, int job){ return new PurgeJobTask(client, job); }},
     };
 
     auto action = rest.substr(slash + 1);
@@ -116,7 +116,7 @@ Task *Task::construct(int client, const std::string& headers)
   const std::size_t SCRIPTS_LEN = sizeof(SCRIPTS) - 1;
   if(path.compare(0, SCRIPTS_LEN, SCRIPTS) == 0) {
     std::string rest = path.substr(SCRIPTS_LEN);
-    if(rest.empty() || rest[0] != '/') {
+    if(rest[0] != '/') {
       return nullptr;
     }
     
@@ -226,45 +226,51 @@ static Task *new_run_task(int client,
 			  const std::string& rest)
 {
   const std::size_t slash = rest.find("/");
-  if (slash == std::string::npos || slash == 0 || slash + 1 >= rest.size()) {
+  if(slash == std::string::npos || slash == 0 || slash + 1 >= rest.size()) {
     return nullptr;
   }
-
   auto action = rest.substr(slash + 1);
-  if (action != "run") {
+  
+  if (action != "run") {    
     return nullptr;
   }
-
+  
   int script_id;
   try {
     script_id = std::stoi(rest.substr(0, slash));
   } catch (...) {
     return nullptr;
   }
+  
+  // Content-Type: application/x-www-form-urlencoded
+  // Body:
+  // args=arg1,arg2,arg3
 
+  // Confirm the content type
   static constexpr char CT[] = "Content-Type: application/x-www-form-urlencoded";
   const std::size_t ct_pos = headers.find(CT);
-  if (ct_pos == std::string::npos) {
+  if(ct_pos == std::string::npos) {
     return nullptr;
   }
-
-  static constexpr char ARGS[] = "args=";
-  const size_t ARGS_LEN = sizeof(ARGS) - 1;
+  
+  // Extract the arglist from the body
+  static constexpr char ARGS[] = "args=";  
+  const size_t ARGS_LEN = sizeof(ARGS) - 1;  
   const std::size_t args_pos = body.find(ARGS);
-  if (args_pos == std::string::npos) {
+  if(args_pos == std::string::npos) {
     return nullptr;
   }
-
-  std::vector<std::string> args;
-  args.reserve(10);
+  
+  // Comma-separated list
+  // We assume that arguments do not have commas
+  std::vector<std::string>args;
+  args.reserve(10);		// A random guess
   std::stringstream arglist(body.substr(args_pos + ARGS_LEN));
   std::string item;
   while (std::getline(arglist, item, ',')) {
     args.push_back(item);
   }
-
-    
-
+  
   return new RunTask(client, script_id, args);
 }
 
@@ -277,25 +283,27 @@ Task *Task::construct(int client,
 		      const std::string& headers,
 		      const std::string& body)
 {
+  // Extract the path
   const std::string path = get_path_from(headers);
   if (path.empty()) {
     return nullptr;
   }
-
-
+  
   static constexpr char SCRIPTS[] = "/scripts/";
   const std::size_t SCRIPTS_LEN = sizeof(SCRIPTS) - 1;
-
-  if (path.size() < SCRIPTS_LEN ||
-      path.compare(0, SCRIPTS_LEN, SCRIPTS) != 0) {
+  
+  if(path.size() < SCRIPTS_LEN ||
+     path.compare(0, SCRIPTS_LEN, SCRIPTS) != 0) {
+    // Not /scripts
     return nullptr;
   }
-
+  
   auto action = path.substr(SCRIPTS_LEN);
-
-  if (action == "upload") {
+  
+  if(action == "upload") {	// /scripts/upload
     return new_upload_task(client, headers, body);
   }
-
+  
+  // /scripts/<id>/run
   return new_run_task(client, headers, body, action);
 }
